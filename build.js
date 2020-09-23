@@ -1,5 +1,8 @@
 const exec = require('child_process').exec
+const path = require('path')
 
+const codeDir  = path.resolve(__dirname, 'src')
+const codeDirReg = new RegExp(`^${codeDir}`)
 
 
 
@@ -16,23 +19,25 @@ function findLatestTag(){
 
 function findChangedFile(latestTag){
   return new Promise((resolve, reject) => {
-    exec(`git diff ${latestTag} --name-status`, (err, stdout) => {
+    exec(`git diff ${latestTag} --name-only --diff-filter=ACMR`, (err, stdout) => {
       if(err) console.error(err)
-      const diffFileList = stdout.split('\n')
-      .filter(str => {
-        if(!str) return false
-        const status = str.split('\t')[0]
-        const file = str.split('\t')[1]
-        return status !== 'D'
+      console.log(stdout)
+      const diffFileList = stdout.split('\n').slice(0, -1)
+      const needBundleList = []
+      diffFileList.forEach(item => {
+        const status = item.split('\t')[0]
+        const filePath = item.split('\t')[1]
+        const fileAbsolutePath = path.resolve(__dirname, filePath)
+        if(status !== 'D' && codeDirReg.test(fileAbsolutePath)){
+          needBundleList.push(fileAbsolutePath)
+        }
+
       })
-      .map(str => {
-        const file = str.split('\t')[1]
-        return file
-      })
-      console.log(diffFileList)
+      resolve(needBundleList)
     })
   })
 }
+
 findLatestTag().then(tag => {
   findChangedFile(tag)
 })
