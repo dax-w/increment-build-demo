@@ -32,7 +32,6 @@ function findChangedFile(preTag){
     exec(`git diff ${preTag} --name-only --diff-filter=ACMR`, (err, stdout) => {
       if(err) console.error(err)
       const diffFileList = stdout.split('\n').filter(s => s)
-      console.log('changedList:', diffFileList)
       const needBundleList = []
       diffFileList.forEach(item => {
         const filePath = item
@@ -43,7 +42,6 @@ function findChangedFile(preTag){
         }
 
       })
-      console.log('Changed Fils List: ', needBundleList)
       resolve(needBundleList)
     })
   })
@@ -211,6 +209,17 @@ function formatDepTree(tree){
   return newDepTree
 }
 
+function getNeedBundleEntryFileList(depTree, changedList){
+  const needBundleEntryList = []
+  for(const key in depTree){
+    const deps = depTree[key].concat([key]) // 将入口文件自己也视为自己的依赖方便查找
+    if(deps.some(dep => changedList.includes(dep))){ // 依赖文件中含有变化了的文件则将其入口文件推入待编译数组
+      needBundleEntryList.push(key)
+    }
+  }
+  return needBundleEntryList
+}
+
 
 /**
  * STEP 1: 复制目录
@@ -226,25 +235,27 @@ function formatDepTree(tree){
 
 async function main(){
   // // 将src整个目录复制到临时目录 TMP_DIR
-  // await copyAllFiles()
+  await copyAllFiles()
 
-  // const allFiles = getAllFiles(TMP_DIR)
-  // const allVueFiles = getAllVueFiles(allFiles)
-  // await replaceImport(allFiles)
-  // await extractAllVue(allVueFiles)
-  // const entries = getEntries(TMP_DIR)
-  // console.log('******************入口文件 START******************\n')
-  // console.log(entries)
-  // console.log('******************入口文件 END****************** \n')
-  // const depTree = await makeDepTree(entries)
-  // console.log('所有入口文件的依赖树: \n')
-  // console.log(depTree)
-  // console.log('删除目录： ', TMP_DIR)
-  // await deleteDir(TMP_DIR)
-  console.log('开始查找发生变化的文件')
+  const allFiles = getAllFiles(TMP_DIR)
+  const allVueFiles = getAllVueFiles(allFiles)
+  await replaceImport(allFiles)
+  await extractAllVue(allVueFiles)
+  const entries = getEntries(TMP_DIR)
+  console.log('******************入口文件 START******************\n')
+  console.log(entries)
+  console.log('******************入口文件 END****************** \n')
+  const depTree = await makeDepTree(entries)
+  console.log('所有入口文件的依赖树: \n')
+  console.log(depTree)
+  console.log('删除目录： ', TMP_DIR)
+  await deleteDir(TMP_DIR)
+  console.log('发生变化的文件\n')
   const changedFileList = await getChangedFileList()
-  
-
+  console.log(changedFileList)
+  const needBundleEntryList = getNeedBundleEntryFileList(depTree, changedFileList)
+  console.log('需要被编译的入口文件： \n')
+  console.log(needBundleEntryList)
 }
 
 
