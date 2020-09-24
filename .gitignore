@@ -1,1 +1,3 @@
 ignore-dir/
+node_modules/
+tmp/

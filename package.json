@@ -1,0 +1,11 @@
+{
+  "devDependencies": {
+    "glob": "^7.1.6",
+    "madge": "^3.10.0",
+    "recursive-copy": "^2.0.11",
+    "replace-in-file": "^6.1.0",
+    "rimraf": "^3.0.2",
+    "typescript": "^4.0.3",
+    "vue-template-compiler": "^2.6.12"
+  }
+}
