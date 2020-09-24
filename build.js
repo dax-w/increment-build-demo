@@ -27,9 +27,9 @@ function findLatestTag(){
   })
 }
 
-function findChangedFile(latestTag){
+function findChangedFile(preTag){
   return new Promise((resolve, reject) => {
-    exec(`git diff ${latestTag} --name-only --diff-filter=ACMR`, (err, stdout) => {
+    exec(`git diff ${preTag} --name-only --diff-filter=ACMR`, (err, stdout) => {
       if(err) console.error(err)
       const diffFileList = stdout.split('\n').filter(s => s)
       console.log('changedList:', diffFileList)
@@ -37,15 +37,28 @@ function findChangedFile(latestTag){
       diffFileList.forEach(item => {
         const filePath = item
         const fileAbsolutePath = path.resolve(__dirname, filePath)
+        // 过滤掉跟源码目录无关的文件
         if(SRC_CODE_DIR_REG.test(fileAbsolutePath)){
           needBundleList.push(fileAbsolutePath)
         }
 
       })
-      console.log('needBundleList: ', needBundleList)
+      console.log('Changed Fils List: ', needBundleList)
       resolve(needBundleList)
     })
   })
+}
+
+async function getChangedFileList(){
+  let fileList = []
+  try{
+    const tag = await findLatestTag()
+    fileList = await findChangedFile(tag)
+  }catch(e){
+    console.log('Get Changed File List Error Occurred\n')
+    console.error(e)
+  }
+  return fileList
 }
 
 // findLatestTag().then(tag => {
@@ -65,7 +78,11 @@ function extractScriptFromVue(vueFile){
   return new Promise(resolve => {
     const vueContent = fs.readFileSync(vueFile, {encoding:'utf-8'})
     const res = vueCompiler.parseComponent(vueContent, {})
-    const scriptContent = res.script.content
+    const scriptContent = res.script && res.script.content || ''
+    if(!scriptContent){
+      console.log(`'${vueFile}' file content is empty`)
+      return resolve()
+    }
     const newFileName = vueFile.replace(/\.vue$/, '.vue.js')
     fs.writeFile(newFileName, scriptContent, (err) => {
       if(err) console.error(err)
@@ -74,18 +91,26 @@ function extractScriptFromVue(vueFile){
       resolve()
     })
   })
+  .catch(err => {
+    console.log(`Extract '${vueFile}' occurred Error \n`)
+    console.error(err)
+  })
+}
+
+function extractAllVue(files){
+  const pList = files.map(f => extractScriptFromVue(f))
+  return Promise.all(pList)
 }
 
 function getAllFiles(dirPath){
-  // const new RegExp(`${dirPath}/\S.(js|vue)$`)
   const files = glob.sync(`${dirPath}/**/*+(.vue|.js)`)
   return files
 }
 
-function getAllVueFiles(files){
+function getAllVueFiles(files = []){
   return files.filter(f => /\.vue$/ig.test(f) )
 }
-function getAllJsFiles(files){
+function getAllJsFiles(files = []){
   return files.filter(f => /\.js$/.test(f))
 }
 
@@ -134,26 +159,91 @@ function checkDirExist(dirPath){
   return isExist
 }
 
-// allVueFiles.forEach(f => {
-//   extractScriptFromVue(f)
-// })
+function replaceImport(file){
+  const options = {
+    files: file,
+    from: /\.vue/,
+    to: `.vue.js`
+  }
+  return replaceFile(options).then(results => {
+    console.log(`替换结果: \n`)
+    console.log(results)
+  })
+  .catch(err => {
+    console.error('Error occurred: \n', err)
+  })
+}
+
+function getEntries(dir){
+  const allFiles = getAllFiles(path.join(dir, 'pages'))
+  return getAllJsFiles(allFiles)
+}
+
+async function makeDepTree(entries = []){
+  const depTree = {}
+  const resList = await Promise.all(entries.map(f => madge(f, {baseDir: TMP_DIR})))
+  resList.forEach((res, index) => {
+    const key = entries[index]
+    const v = res.obj()
+    depTree[key] = v
+  })
+  return formatDepTree(depTree)
+}
+
+function formatDepTree(tree){
+  const newDepTree = {}
+  for(const key in tree){
+    const v = tree[key]
+    const deps = Object.values(v).reduce((pre, cur) => {
+      return pre.concat(cur) 
+    }, [])
+    deps.forEach((dep, index) => {
+    })
+    const newDeps = deps.map(dep => {
+      dep = dep.replace(`.vue.js`, '.vue')
+      dep = path.join(TMP_DIR, dep)  // 拼接绝对路径
+      dep = dep.replace(TMP_DIR, SRC_CODE_DIR) // 将TMP_DIR  替换成SRC_DIR
+      return dep
+    })
+    const newKey = key.replace(TMP_DIR, SRC_CODE_DIR)
+    newDepTree[newKey] = newDeps
+  }
+  return newDepTree
+}
+
 
 /**
  * STEP 1: 复制目录
  * STEP 2: 修改所有文件中 import xxx from 'xxx.vue' 为  import xxx from 'xxx.vue.js'
  * STEP 3: 提取vue文件到js文件 并命名为  xxx.vue.js
- * STEP 4: 分析所有入口js文件生成依赖树
- * STEP 5: 修改依赖树中 ".vue.js"后缀的文件名字为 ".vue"
- * STEP 6: 查找src目录中发生变化的文件
- * STEP 7: 利用变化的文件与依赖树比对计算出需要打包的入口文件 
+ * STEP 4: 找到所有入口文件 
+
+ * STEP 5: 分析所有入口js文件生成依赖树
+ * STEP 6: 修改依赖树中 ".vue.js"后缀的文件名字为 ".vue"
+ * STEP 7: 查找src目录中发生变化的文件
+ * STEP 8: 利用变化的文件与依赖树比对计算出需要打包的入口文件 
  */
 
 async function main(){
-  // 将src整个目录复制到临时目录 TMP_DIR
-  await copyAllFiles()
+  // // 将src整个目录复制到临时目录 TMP_DIR
+  // await copyAllFiles()
 
-  const allFiles = getAllFiles(SRC_CODE_DIR)
-  const allVueFiles = getAllVueFiles(allFiles)
+  // const allFiles = getAllFiles(TMP_DIR)
+  // const allVueFiles = getAllVueFiles(allFiles)
+  // await replaceImport(allFiles)
+  // await extractAllVue(allVueFiles)
+  // const entries = getEntries(TMP_DIR)
+  // console.log('******************入口文件 START******************\n')
+  // console.log(entries)
+  // console.log('******************入口文件 END****************** \n')
+  // const depTree = await makeDepTree(entries)
+  // console.log('所有入口文件的依赖树: \n')
+  // console.log(depTree)
+  // console.log('删除目录： ', TMP_DIR)
+  // await deleteDir(TMP_DIR)
+  console.log('开始查找发生变化的文件')
+  const changedFileList = await getChangedFileList()
+  
 
 }
 
