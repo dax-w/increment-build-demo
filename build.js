@@ -18,7 +18,9 @@ const extractedVueFiles = []
 
 function findLatestTag(){
   return new Promise((resolve, reject) => {
-    exec('git tag --list', (err, stdout, stderr) => {
+    const command = 'git tag --list --sort=v:refname '
+    console.log('执行: ', command)
+    exec(command, (err, stdout, stderr) => {
       if(err) console.error(err)
       const tagList = stdout.split('\n').filter(it => it)
       const latestTag = tagList[tagList.length - 2]
@@ -29,20 +31,13 @@ function findLatestTag(){
 
 function findChangedFile(preTag){
   return new Promise((resolve, reject) => {
-    exec(`git diff ${preTag} --name-only --diff-filter=ACMR`, (err, stdout) => {
+    const command = `git diff ${preTag} --name-only --diff-filter=ACMR`
+    console.log('执行: ', command)
+    exec(command, (err, stdout) => {
       if(err) console.error(err)
       const diffFileList = stdout.split('\n').filter(s => s)
-      const needBundleList = []
-      diffFileList.forEach(item => {
-        const filePath = item
-        const fileAbsolutePath = path.resolve(__dirname, filePath)
-
-        // 过滤掉跟源码目录无关的文件
-        // if(SRC_CODE_DIR_REG.test(fileAbsolutePath)){
-        //   needBundleList.push(fileAbsolutePath)
-        // }
-        needBundleList.push(fileAbsolutePath)
-
+      const needBundleList = diffFileList.map(f => {
+        return path.resolve(__dirname, f)
       })
       resolve(needBundleList)
     })
