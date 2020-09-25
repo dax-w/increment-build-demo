@@ -37,9 +37,10 @@ function findChangedFile(preTag){
         const filePath = item
         const fileAbsolutePath = path.resolve(__dirname, filePath)
         // 过滤掉跟源码目录无关的文件
-        if(SRC_CODE_DIR_REG.test(fileAbsolutePath)){
-          needBundleList.push(fileAbsolutePath)
-        }
+        // if(SRC_CODE_DIR_REG.test(fileAbsolutePath)){
+        //   needBundleList.push(fileAbsolutePath)
+        // }
+        needBundleList.push(fileAbsolutePath)
 
       })
       resolve(needBundleList)
@@ -57,19 +58,6 @@ async function getChangedFileList(){
     console.error(e)
   }
   return fileList
-}
-
-// findLatestTag().then(tag => {
-//   findChangedFile(tag)
-// })
-
-
-// madge(path.resolve(__dirname, 'src/a.js')).then(res => {
-//   console.log(res.obj())
-// })
-
-function replaceAllFileImportVue(filePath){
-
 }
 
 function extractScriptFromVue(vueFile){
@@ -252,19 +240,18 @@ async function main(){
   await replaceImport(allFiles)
   await extractAllVue(allVueFiles)
   const entries = getEntries(TMP_DIR)
-  console.log('******************入口文件 START******************\n')
+  console.log('\n\n******************所有入口文件 ******************\n')
   console.log(entries)
-  console.log('******************入口文件 END****************** \n')
   const depTree = await makeDepTree(entries)
-  console.log('所有入口文件的依赖树: \n')
+  console.log('\n\n所有入口文件的依赖树: \n\n')
   console.log(depTree)
-  console.log('删除目录： ', TMP_DIR)
+  console.log('删除临时目录： ', TMP_DIR)
   await deleteDir(TMP_DIR)
-  console.log('发生变化的文件\n')
+  console.log('\n\n发生变化的文件\n\n')
   const changedFileList = await getChangedFileList()
   console.log(changedFileList)
   const needBundleEntryList = getNeedBundleEntryFileList(depTree, changedFileList)
-  console.log('需要被编译的入口文件： \n')
+  console.log('\n\n 需要被编译的入口文件： \n')
   console.log(needBundleEntryList)
 }
 
