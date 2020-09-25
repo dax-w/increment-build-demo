@@ -179,10 +179,20 @@ function getEntries(dir){
 
 async function makeDepTree(entries = []){
   const depTree = {}
-  const resList = await Promise.all(entries.map(f => madge(f, {baseDir: TMP_DIR})))
+  const options = {
+    baseDir: TMP_DIR,
+    fileExtensions: ['.js'],
+    detectiveOptions: {
+      "es6": {
+        "mixedImports": true
+      }
+    }
+  }
+  const resList = await Promise.all(entries.map(f => madge(f,options)))
   resList.forEach((res, index) => {
     const key = entries[index]
     const v = res.obj()
+    console.log(v)
     depTree[key] = v
   })
   return formatDepTree(depTree)
