@@ -36,6 +36,7 @@ function findChangedFile(preTag){
       diffFileList.forEach(item => {
         const filePath = item
         const fileAbsolutePath = path.resolve(__dirname, filePath)
+
         // 过滤掉跟源码目录无关的文件
         // if(SRC_CODE_DIR_REG.test(fileAbsolutePath)){
         //   needBundleList.push(fileAbsolutePath)
