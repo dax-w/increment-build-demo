@@ -68,7 +68,7 @@ function extractScriptFromVue(vueFile){
     const newFileName = vueFile.replace(/\.vue$/, '.vue.js')
     fs.writeFile(newFileName, scriptContent, (err) => {
       if(err) console.error(err)
-      console.log(`File '${vueFile}' has been extracted to ${newFileName}`)
+      console.log(`File '${vueFile}' \n has been extracted to \n ${newFileName}`)
       extractedVueFiles.push(newFileName)
       resolve()
     })
@@ -121,7 +121,7 @@ function deleteDir(dirPath){
         resolve()
       })
     }else {
-      console.error(`Directory '${dirPath}' is not found`)
+      console.error(`Directory '${dirPath}' is not found, dont need delete`)
       resolve()
     }
   })
@@ -148,8 +148,8 @@ function replaceImport(file){
     to: `.vue.js`
   }
   return replaceFile(options).then(results => {
-    console.log(`替换结果: \n`)
-    console.log(results)
+    console.log(`发生替换的文件: \n`)
+    console.log(results.filter(it => it.hasChanged).map(it => it.file))
   })
   .catch(err => {
     console.error('Error occurred: \n', err)
@@ -176,7 +176,6 @@ async function makeDepTree(entries = []){
   resList.forEach((res, index) => {
     const key = entries[index]
     const v = res.obj()
-    console.log(v)
     depTree[key] = v
   })
   return formatDepTree(depTree)
@@ -216,39 +215,48 @@ function getNeedBundleEntryFileList(depTree, changedList){
 
 
 /**
- * STEP 1: 复制目录
- * STEP 2: 修改所有文件中 import xxx from 'xxx.vue' 为  import xxx from 'xxx.vue.js'
- * STEP 3: 提取vue文件到js文件 并命名为  xxx.vue.js
- * STEP 4: 找到所有入口文件 
-
- * STEP 5: 分析所有入口js文件生成依赖树
- * STEP 6: 修改依赖树中 ".vue.js"后缀的文件名字为 ".vue"
- * STEP 7: 查找src目录中发生变化的文件
+ * STEP 1: 查找发生变化的文件
+ * STEP 2: 复制目录
+ * STEP 3: 修改所有文件中 import xxx from 'xxx.vue' 为  import xxx from 'xxx.vue.js'
+ * STEP 4: 提取vue文件到js文件 并命名为  xxx.vue.js
+ * STEP 5: 找到所有入口文件 
+ * STEP 6: 分析所有入口js文件生成依赖树
+ * STEP 7: 修改依赖树中 ".vue.js"后缀的文件名字为 ".vue"
  * STEP 8: 利用变化的文件与依赖树比对计算出需要打包的入口文件 
  */
 
 async function main(){
+
+  console.log('\n\n发生变化的文件\n\n')
+  const changedFileList = await getChangedFileList()
+  // 若package.json 发生改变 直接触发全量打包
+  if(changedFileList.includes('package.json')){
+    const entries = getEntries(SRC_CODE_DIR)
+    console.log('\n\n 检测到 package.json 改动, 触发全量打包： \n')
+    console.log(entries)
+    return entries
+  }
+
   // // 将src整个目录复制到临时目录 TMP_DIR
   await copyAllFiles()
 
   const allFiles = getAllFiles(TMP_DIR)
   const allVueFiles = getAllVueFiles(allFiles)
-  await replaceImport(allFiles)
-  await extractAllVue(allVueFiles)
   const entries = getEntries(TMP_DIR)
   console.log('\n\n******************所有入口文件 ******************\n')
   console.log(entries)
+  await replaceImport(allFiles)
+  await extractAllVue(allVueFiles)
   const depTree = await makeDepTree(entries)
   console.log('\n\n所有入口文件的依赖树: \n\n')
   console.log(depTree)
   console.log('删除临时目录： ', TMP_DIR)
   await deleteDir(TMP_DIR)
-  console.log('\n\n发生变化的文件\n\n')
-  const changedFileList = await getChangedFileList()
   console.log(changedFileList)
   const needBundleEntryList = getNeedBundleEntryFileList(depTree, changedFileList)
   console.log('\n\n 需要被编译的入口文件： \n')
   console.log(needBundleEntryList)
+  return needBundleEntryList
 }
 
 
